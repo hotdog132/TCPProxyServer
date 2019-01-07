@@ -3,40 +3,78 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"os"
-	"strconv"
+	"log"
+	"net"
 	"strings"
+
+	"github.com/hotdog132/TCPProxyServer/tcpServer/requestlimiter"
+)
+
+const (
+	port        = "8000"
+	externalAPI = "http://localhost:8888/api"
 )
 
 func main() {
-	//Enter your code here. Read input from STDIN. Print output to STDOUT
-	L := []string{}
-	scanner := bufio.NewScanner(os.Stdin)
-	if scanner.Scan() {
-		LStr := scanner.Text()
-		L = strings.Split(LStr, ",")
-	} else {
-		fmt.Println(0)
+	// arguments := os.Args
+	// if len(arguments) == 1 {
+	// 	fmt.Println("Please provide a port number!")
+	// 	return
+	// }
+
+	// PORT := ":" + arguments[1]
+	log.Println("Start listening port:" + port)
+	l, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
-	maxStreak := 0
-	currentStreak := 0
-	for _, value := range L {
-		value = strings.Replace(value, " ", "", -1)
-		if v, err := strconv.Atoi(value); err == nil {
-			currentStreak += v
-			if currentStreak > maxStreak {
-				maxStreak = currentStreak
-			}
+	defer l.Close()
 
-			if currentStreak < 0 {
-				currentStreak = 0
-			}
-		} else {
-			fmt.Println(0)
+	jl := &requestlimiter.JobLimiter{}
+	jl.Init(1)
+
+	for {
+		c, err := l.Accept()
+		if err != nil {
+			fmt.Println(err)
 			return
 		}
+		go handleConnection(c, jl)
 	}
+}
 
-	fmt.Println(maxStreak)
+func handleConnection(c net.Conn, jl *requestlimiter.JobLimiter) {
+	log.Printf("Serving %s\n", c.RemoteAddr().String())
+	for {
+		netData, err := bufio.NewReader(c).ReadString('\n')
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		temp := strings.TrimSpace(string(netData))
+		if temp == "quit" {
+			break
+		}
+
+		// result := strconv.Itoa(rand.Intn(100)) + "\n"
+
+		// external api call
+		// resp, err := http.Get(externalAPI)
+		// if err != nil {
+		// 	// handle the case when external api shut down
+		// }
+		// defer resp.Body.Close()
+		// body, err := ioutil.ReadAll(resp.Body)
+
+		// c.Write([]byte(string(body) + "\n"))
+
+		job := &requestlimiter.Job{}
+		job.SetNetConnection(c)
+		job.SetHost(c.RemoteAddr().String())
+		jl.EnqueueJob(job)
+
+	}
+	c.Close()
 }
