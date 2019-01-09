@@ -33,6 +33,7 @@ func main() {
 
 	jl := &requestlimiter.JobLimiter{}
 	jl.Init(1)
+	jl.SetExternalAPI(externalAPI)
 
 	for {
 		c, err := l.Accept()
@@ -46,6 +47,11 @@ func main() {
 
 func handleConnection(c net.Conn, jl *requestlimiter.JobLimiter) {
 	log.Printf("Serving %s\n", c.RemoteAddr().String())
+
+	defer func() {
+		c.Close()
+	}()
+
 	for {
 		netData, err := bufio.NewReader(c).ReadString('\n')
 		if err != nil {
@@ -53,28 +59,17 @@ func handleConnection(c net.Conn, jl *requestlimiter.JobLimiter) {
 			return
 		}
 
-		temp := strings.TrimSpace(string(netData))
-		if temp == "quit" {
+		query := strings.TrimSpace(string(netData))
+		if query == "quit" {
 			break
 		}
-
-		// result := strconv.Itoa(rand.Intn(100)) + "\n"
-
-		// external api call
-		// resp, err := http.Get(externalAPI)
-		// if err != nil {
-		// 	// handle the case when external api shut down
-		// }
-		// defer resp.Body.Close()
-		// body, err := ioutil.ReadAll(resp.Body)
-
-		// c.Write([]byte(string(body) + "\n"))
 
 		job := &requestlimiter.Job{}
 		job.SetNetConnection(c)
 		job.SetHost(c.RemoteAddr().String())
+		job.SetQuery(query)
+
 		jl.EnqueueJob(job)
 
 	}
-	c.Close()
 }

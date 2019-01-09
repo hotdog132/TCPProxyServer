@@ -1,7 +1,9 @@
 package requestlimiter
 
 import (
+	"io/ioutil"
 	"log"
+	"net/http"
 	"time"
 )
 
@@ -13,6 +15,7 @@ type JobLimiter struct {
 	currentJobCount    int
 	ticker             *time.Ticker
 	limitQPS           int
+	externalAPI        string
 }
 
 // Init initial the job queue
@@ -47,6 +50,11 @@ func (jl *JobLimiter) Init(limitQPS int) {
 
 }
 
+// SetExternalAPI ...
+func (jl *JobLimiter) SetExternalAPI(externalAPI string) {
+	jl.externalAPI = externalAPI
+}
+
 // EnqueueJob ...
 func (jl *JobLimiter) EnqueueJob(job *Job) {
 	jl.pendingJobQueue <- job
@@ -55,8 +63,17 @@ func (jl *JobLimiter) EnqueueJob(job *Job) {
 
 func (jl *JobLimiter) processJobWorker(jobs chan *Job) {
 	for job := range jobs {
-		time.Sleep(3 * time.Second)
-		job.WriteResult(job.getHost() + " job completed.")
+		// external api call
+		resp, err := http.Get(jl.externalAPI)
+		if err != nil {
+			// handle the case when external api shut down
+			job.WriteResult(job.getHost() + " external api is not available.")
+			break
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		job.WriteResult(job.getHost() + " query result: " + string(body))
 	}
 }
 

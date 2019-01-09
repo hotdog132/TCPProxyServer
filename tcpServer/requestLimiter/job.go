@@ -4,8 +4,9 @@ import "net"
 
 // Job ...
 type Job struct {
-	c    net.Conn
-	host string
+	c     net.Conn
+	host  string
+	query string
 }
 
 // SetNetConnection ...
@@ -16,6 +17,11 @@ func (j *Job) SetNetConnection(c net.Conn) {
 // SetHost ...
 func (j *Job) SetHost(host string) {
 	j.host = host
+}
+
+// SetQuery ...
+func (j *Job) SetQuery(query string) {
+	j.query = query
 }
 
 func (j *Job) getHost() string {
