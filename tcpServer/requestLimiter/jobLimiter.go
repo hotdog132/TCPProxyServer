@@ -13,6 +13,7 @@ type JobLimiter struct {
 	processingJobQueue chan *Job
 	deliverPause       chan bool
 	currentJobCount    int
+	processedJobCount  int
 	ticker             *time.Ticker
 	limitQPS           int
 	externalAPI        string
@@ -50,6 +51,21 @@ func (jl *JobLimiter) Init(limitQPS int) {
 
 }
 
+// GetRequestRatePerSec Get processing job count
+func (jl *JobLimiter) GetRequestRatePerSec() int {
+	return jl.currentJobCount
+}
+
+// GetRemainingJobCount Get remaining jobs from pendingJobQueue
+func (jl *JobLimiter) GetRemainingJobCount() int {
+	return len(jl.pendingJobQueue)
+}
+
+// GetProcessedJobCount get proccessed job count
+func (jl *JobLimiter) GetProcessedJobCount() int {
+	return jl.processedJobCount
+}
+
 // SetExternalAPI ...
 func (jl *JobLimiter) SetExternalAPI(externalAPI string) {
 	jl.externalAPI = externalAPI
@@ -68,12 +84,14 @@ func (jl *JobLimiter) processJobWorker(jobs chan *Job) {
 		if err != nil {
 			// handle the case when external api shut down
 			job.WriteResult(job.getHost() + " external api is not available.")
-			break
+			continue
 		}
 
 		body, err := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 		job.WriteResult(job.getHost() + " query result: " + string(body))
+
+		jl.processedJobCount++
 	}
 }
 

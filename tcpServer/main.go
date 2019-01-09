@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/hotdog132/TCPProxyServer/tcpServer/requestlimiter"
+	"github.com/hotdog132/TCPProxyServer/tcpServer/statistics"
 )
 
 const (
@@ -35,21 +36,30 @@ func main() {
 	jl.Init(1)
 	jl.SetExternalAPI(externalAPI)
 
+	lStatics, err := net.Listen("tcp", ":"+"7000")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	serverStatus := &statistics.ServerStatus{}
+	serverStatus.Init(lStatics, jl)
+
 	for {
 		c, err := l.Accept()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		go handleConnection(c, jl)
+		go handleConnection(c, jl, serverStatus)
 	}
 }
 
-func handleConnection(c net.Conn, jl *requestlimiter.JobLimiter) {
+func handleConnection(c net.Conn, jl *requestlimiter.JobLimiter, ss *statistics.ServerStatus) {
 	log.Printf("Serving %s\n", c.RemoteAddr().String())
-
+	ss.PeerConnectionCount++
 	defer func() {
 		c.Close()
+		ss.PeerConnectionCount--
 	}()
 
 	for {
@@ -70,6 +80,5 @@ func handleConnection(c net.Conn, jl *requestlimiter.JobLimiter) {
 		job.SetQuery(query)
 
 		jl.EnqueueJob(job)
-
 	}
 }
