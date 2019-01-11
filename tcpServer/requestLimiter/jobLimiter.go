@@ -28,6 +28,7 @@ func (jl *JobLimiter) Init(limitQPS int) {
 	jl.currentJobCount = 0
 	jl.limitQPS = limitQPS
 
+	// Initial workers to do jobs from processingJobQueue
 	for i := 1; i < 100; i++ {
 		go jl.processJobWorker(jl.processingJobQueue)
 	}
@@ -38,13 +39,13 @@ func (jl *JobLimiter) Init(limitQPS int) {
 		for t := range jl.ticker.C {
 			select {
 			case jl.deliverPause <- true:
-				log.Println("resume pause", t)
+				log.Println("Resume pause of limited QPS", t)
 			default:
 			}
 
+			// Clear currentJobCount per second
 			if jl.currentJobCount != 0 {
 				jl.currentJobCount = 0
-				log.Println("clear count", t)
 			}
 		}
 	}()
@@ -74,16 +75,18 @@ func (jl *JobLimiter) SetExternalAPI(externalAPI string) {
 // EnqueueJob ...
 func (jl *JobLimiter) EnqueueJob(job *Job) {
 	jl.pendingJobQueue <- job
-	log.Println(job.getHost(), "enqueued.")
+	log.Println(job.getHost(), "enqueued a job")
 }
 
 func (jl *JobLimiter) processJobWorker(jobs chan *Job) {
 	for job := range jobs {
-		// external api call
-		resp, err := http.Get(jl.externalAPI)
+		// External api call
+		queryURL := jl.externalAPI + "?q=" + job.GetQuery()
+		resp, err := http.Get(queryURL)
 		if err != nil {
-			// handle the case when external api shut down
+			// Handle the case when external api shut down
 			job.WriteResult(job.getHost() + " external api is not available.")
+			jl.processedJobCount++
 			continue
 		}
 
@@ -97,10 +100,11 @@ func (jl *JobLimiter) processJobWorker(jobs chan *Job) {
 
 func (jl *JobLimiter) jobDeliver(pendingJobs chan *Job) {
 	for job := range pendingJobs {
-		if jl.currentJobCount > jl.limitQPS {
-			log.Println("jobDeliver pause")
+		if jl.currentJobCount >= jl.limitQPS {
+			log.Println("Pause due to limited QPS")
 			<-jl.deliverPause
-			log.Println("jobDeliver resume")
+			log.Println("Resume pause and clear currentJobCount")
+			jl.currentJobCount = 0
 		}
 
 		jl.processingJobQueue <- job

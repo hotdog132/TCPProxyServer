@@ -21,15 +21,21 @@ func (ss *ServerStatus) Init(l net.Listener, jl *requestlimiter.JobLimiter) {
 }
 
 func (ss *ServerStatus) initStaticAPIRouter(l net.Listener) {
+	// fs := http.FileServer(http.Dir("/var/www/tpl"))
+	// http.Handle("/*filepath", fs)
 	http.HandleFunc("/statistics", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `
-		Current connection count: %d
-		--------------------------
-		Request per second:%d
-		--------------------------
-		Processed request count:%d
-		--------------------------
-		Remaining jobs:%d`, ss.PeerConnectionCount, ss.jobLimiter.GetRequestRatePerSec(),
+		<head>
+		<meta http-equiv="refresh" content="2">
+		</head>
+		TCP server status (Refresh the page every 2 sec) <br /><br />
+		Current connection count: %d <br />
+		-------------------------- <br />
+		Request per second: %d <br />
+		-------------------------- <br />
+		Processed request count: %d <br />
+		-------------------------- <br />
+		Remaining jobs: %d`, ss.PeerConnectionCount, ss.jobLimiter.GetRequestRatePerSec(),
 			ss.jobLimiter.GetProcessedJobCount(), ss.jobLimiter.GetRemainingJobCount())
 	})
 
