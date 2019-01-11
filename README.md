@@ -11,7 +11,7 @@ TCP Server to communicate between external API and client using Go.
 ## Addition
 - [ ] Handle case when the external api is available but not response
 - [ ] Clear jobs in the pending queue when peer disconnect
-- [ ] Save jobs to DB to reduce memory usage
+- [ ] Save jobs to DB to reduce memory usage (Refactoring using interface)
 
 ## Setup & launch
 
