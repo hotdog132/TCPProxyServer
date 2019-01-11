@@ -75,7 +75,7 @@ func (jl *JobLimiter) SetExternalAPI(externalAPI string) {
 // EnqueueJob ...
 func (jl *JobLimiter) EnqueueJob(job *Job) {
 	jl.pendingJobQueue <- job
-	log.Println(job.getHost(), "enqueued a job")
+	// log.Println(job.getHost(), "enqueued a job")
 }
 
 func (jl *JobLimiter) processJobWorker(jobs chan *Job) {
