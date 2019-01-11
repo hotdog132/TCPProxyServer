@@ -63,6 +63,7 @@ func handleConnection(c net.Conn, jl *requestlimiter.JobLimiter, ss *statistics.
 	log.Printf("Serving %s\n", c.RemoteAddr().String())
 	ss.PeerConnectionCount++
 	defer func() {
+		log.Println(c.RemoteAddr().String() + " disconnect")
 		c.Close()
 		ss.PeerConnectionCount--
 	}()
@@ -73,7 +74,7 @@ func handleConnection(c net.Conn, jl *requestlimiter.JobLimiter, ss *statistics.
 		c.SetDeadline(time.Now().Add(time.Duration(connectionTimeoutBySec) * time.Second))
 		netData, err := bufio.NewReader(c).ReadString('\n')
 		if err != nil {
-			log.Println(err)
+			log.Println(c.RemoteAddr().String() + " " + err.Error())
 			return
 		}
 
@@ -84,7 +85,7 @@ func handleConnection(c net.Conn, jl *requestlimiter.JobLimiter, ss *statistics.
 		}
 
 		if query == "quit" {
-			break
+			return
 		}
 
 		job := &requestlimiter.Job{}
