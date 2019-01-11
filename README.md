@@ -15,22 +15,22 @@ TCP Server to communicate between external API and client using Go.
 
 ### Setup & launch
 
-#Initialization
+# Initialization
 ```
 go mod init
 ```
 
-#Launch mock external API
+# Launch mock external API
 ```
 go run externalAPI/main.go
 ```
 
 Default config of mock external API:
 - Port:8888
-- It takes 2 seconds to handle the request
+- It takes 2 seconds to handle the request from TCP server
 
 
-#Launch TCP server
+# Launch TCP server
 ```
 go run tcpServer/main.go
 ```
@@ -41,7 +41,7 @@ Default config of TCP server:
 - Peer connection timeout: 120 seconds
 
 
-#Http endpoint:
+# Http endpoint:
 - http://localhost:7000/statistics
 - Refresh the page every 2 seconds
 
@@ -53,5 +53,5 @@ nc localhost 8000
 
 Type any query string and send it to TCP server.
 
-Open http://localhost:7000/statistics to check current status of the TCP server.
+Open http://localhost:7000/statistics to check current status of TCP server.
 
