@@ -100,7 +100,7 @@ func handleConnection(c net.Conn, jl *requestlimiter.JobLimiter, ss *statistics.
 func showInstructions(c net.Conn) {
 	c.Write([]byte("*** Type any string queries to get informations from external API.\n"))
 	c.Write([]byte("*** Queries couldn't contains any special charactors, space or tab, and length of 100 limited.\n"))
-	c.Write([]byte("*** Disconnect if the server doesn't received any message within " +
+	c.Write([]byte("*** Disconnect if the server doesn't received any messages within " +
 		strconv.Itoa(connectionTimeoutBySec) + " seconds.\n"))
 }
 

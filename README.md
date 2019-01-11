@@ -51,7 +51,7 @@ Default config of TCP server:
 nc localhost 8000
 ```
 
-Type any query string and send it to TCP server.
+Type any query strings and send it to TCP server.
 Type 'quit' or force stop using cmd to disconnect from TCP server.
 
 Open http://localhost:7000/statistics to check current status of TCP server.
