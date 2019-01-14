@@ -9,44 +9,50 @@ import (
 
 // JobLimiter mechanism for the feature of the request rate limiter
 type JobLimiter struct {
-	pendingJobQueue    chan *Job
-	processingJobQueue chan *Job
-	deliverPause       chan bool
-	currentJobCount    int
-	processedJobCount  int
-	ticker             *time.Ticker
-	limitQPS           int
-	externalAPI        string
+	cPendingJobQueue    chan *Job
+	cProcessingJobQueue chan *Job
+	currentJobCounter   *JobCounter
+	cDeliverPause       chan bool
+	cProcessedJobCount  chan int
+	ticker              *time.Ticker
+	externalAPI         string
+	processedJobCount   int
+	limitQPS            int
 }
 
 // Init initial the job queue
 func (jl *JobLimiter) Init(limitQPS int) {
 	jl.ticker = time.NewTicker(2 * time.Second)
-	jl.pendingJobQueue = make(chan *Job, 100)
-	jl.processingJobQueue = make(chan *Job, 100)
-	jl.deliverPause = make(chan bool)
-	jl.currentJobCount = 0
+	jl.cPendingJobQueue = make(chan *Job, 100)
+	jl.cProcessingJobQueue = make(chan *Job, 100)
+	jl.cDeliverPause = make(chan bool)
+	jl.cProcessedJobCount = make(chan int, 100)
 	jl.limitQPS = limitQPS
+	jl.currentJobCounter = &JobCounter{}
 
-	// Initial workers to do jobs from processingJobQueue
+	// Initial workers to do jobs from cProcessingJobQueue
 	for i := 1; i < 100; i++ {
-		go jl.processJobWorker(jl.processingJobQueue)
+		go jl.processJobWorker(jl.cProcessingJobQueue)
 	}
 
-	go jl.jobDeliver(jl.pendingJobQueue)
+	jl.processedJobCountWorker()
+
+	go jl.jobDeliver(jl.cPendingJobQueue)
 
 	go func() {
+		defer jl.ticker.Stop()
+
 		for t := range jl.ticker.C {
 			select {
-			case jl.deliverPause <- true:
+			case jl.cDeliverPause <- true:
 				log.Println("Resume pause of limited QPS", t)
 			default:
 			}
 
 			// Clear currentJobCount per second
-			if jl.currentJobCount != 0 {
-				jl.currentJobCount = 0
-			}
+			// if jl.currentJobCounter.getJobCount() != 0 {
+			jl.currentJobCounter.setJobCount(0)
+			// }
 		}
 	}()
 
@@ -54,12 +60,12 @@ func (jl *JobLimiter) Init(limitQPS int) {
 
 // GetRequestRatePerSec Get processing job count
 func (jl *JobLimiter) GetRequestRatePerSec() int {
-	return jl.currentJobCount
+	return jl.currentJobCounter.getJobCountWithoutLock()
 }
 
-// GetRemainingJobCount Get remaining jobs from pendingJobQueue
+// GetRemainingJobCount Get remaining jobs from cPendingJobQueue
 func (jl *JobLimiter) GetRemainingJobCount() int {
-	return len(jl.pendingJobQueue)
+	return len(jl.cPendingJobQueue)
 }
 
 // GetProcessedJobCount get proccessed job count
@@ -74,8 +80,17 @@ func (jl *JobLimiter) SetExternalAPI(externalAPI string) {
 
 // EnqueueJob ...
 func (jl *JobLimiter) EnqueueJob(job *Job) {
-	jl.pendingJobQueue <- job
+	jl.cPendingJobQueue <- job
 	// log.Println(job.getHost(), "enqueued a job")
+}
+
+// processedJobCountWorker Set a worker for handling processed job count to avoid race condition
+func (jl *JobLimiter) processedJobCountWorker() {
+	go func() {
+		for count := range jl.cProcessedJobCount {
+			jl.processedJobCount += count
+		}
+	}()
 }
 
 func (jl *JobLimiter) processJobWorker(jobs chan *Job) {
@@ -86,7 +101,7 @@ func (jl *JobLimiter) processJobWorker(jobs chan *Job) {
 		if err != nil {
 			// Handle the case when external api shut down
 			job.WriteResult(job.getHost() + " external api is not available.")
-			jl.processedJobCount++
+			jl.cProcessedJobCount <- 1
 			continue
 		}
 
@@ -94,20 +109,21 @@ func (jl *JobLimiter) processJobWorker(jobs chan *Job) {
 		resp.Body.Close()
 		job.WriteResult(job.getHost() + " query result: " + string(body))
 
-		jl.processedJobCount++
+		jl.cProcessedJobCount <- 1
 	}
 }
 
 func (jl *JobLimiter) jobDeliver(pendingJobs chan *Job) {
 	for job := range pendingJobs {
-		if jl.currentJobCount >= jl.limitQPS {
+		if jl.currentJobCounter.getJobCount() >= jl.limitQPS {
 			log.Println("Pause due to limited QPS")
-			<-jl.deliverPause
+			<-jl.cDeliverPause
 			log.Println("Resume pause and clear currentJobCount")
-			jl.currentJobCount = 0
+			jl.currentJobCounter.setJobCount(0)
 		}
 
-		jl.processingJobQueue <- job
-		jl.currentJobCount++
+		jl.cProcessingJobQueue <- job
+
+		jl.currentJobCounter.addJobCount(1)
 	}
 }
