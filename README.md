@@ -1,4 +1,4 @@
-# TCPProxyServer
+# TCP proxy server
 TCP Server to communicate between external API and client using Go.
 
 ## To-Do
